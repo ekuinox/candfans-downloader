@@ -26,7 +26,7 @@ impl CandfansClient {
     }
 
     pub async fn get_user(&self, user_code: &str) -> Result<GetUserSuccessData> {
-        let res: CandifansResponse<GetUserSuccessData> = self
+        let res: CandfansResponse<GetUserSuccessData> = self
             .request(Method::GET, "https://candfans.jp/api/user/get-users")?
             .query(&[("user_code", user_code)])
             .send()
@@ -37,7 +37,7 @@ impl CandfansClient {
     }
 
     pub async fn get_post(&self, user_id: usize, page_idx: usize) -> Result<Vec<PostData>> {
-        let res: CandifansResponse<Vec<PostData>> = self
+        let res: CandfansResponse<Vec<PostData>> = self
             .request(Method::GET, "https://candfans.jp/api/contents/get-timeline")?
             .query(&[("user_id", user_id), ("page", page_idx)])
             .send()
@@ -50,12 +50,12 @@ impl CandfansClient {
 
 #[derive(Deserialize, Debug)]
 #[serde(bound = "T: DeserializeOwned", untagged)]
-pub enum CandifansResponse<T: DeserializeOwned> {
+pub enum CandfansResponse<T: DeserializeOwned> {
     Ok { data: T, status: String },
     Err(ErrorData),
 }
 
-impl<T: DeserializeOwned> CandifansResponse<T> {
+impl<T: DeserializeOwned> CandfansResponse<T> {
     pub fn into_anyhow_result(self) -> Result<T> {
         match self {
             Self::Ok { data, .. } => Ok(data),
