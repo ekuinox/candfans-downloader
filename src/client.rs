@@ -33,7 +33,7 @@ impl CandfansClient {
             .await?
             .json()
             .await?;
-        res.to_anyhow_result()
+        res.into_anyhow_result()
     }
 
     pub async fn get_post(&self, user_id: usize, page_idx: usize) -> Result<Vec<PostData>> {
@@ -44,7 +44,7 @@ impl CandfansClient {
             .await?
             .json()
             .await?;
-        res.to_anyhow_result()
+        res.into_anyhow_result()
     }
 }
 
@@ -56,7 +56,7 @@ pub enum CandifansResponse<T: DeserializeOwned> {
 }
 
 impl<T: DeserializeOwned> CandifansResponse<T> {
-    pub fn to_anyhow_result(self) -> Result<T> {
+    pub fn into_anyhow_result(self) -> Result<T> {
         match self {
             Self::Ok { data, .. } => Ok(data),
             Self::Err(err) => Err(err.into()),
