@@ -1,7 +1,6 @@
 mod client;
 
 use std::{
-    collections::HashSet,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -9,7 +8,7 @@ use std::{
     },
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Parser;
 use futures::future::join_all;
 
@@ -43,7 +42,7 @@ pub struct Cli {
     extensions: Vec<String>,
 
     /// 出力ディレクトリ なければ target を使う
-    #[clap(long)]
+    #[clap(short = 'O', long)]
     output: Option<PathBuf>,
 }
 
@@ -89,49 +88,49 @@ async fn main() -> Result<()> {
 
     std::fs::create_dir_all(&output)?;
 
-    let extensions = extensions.into_iter().collect::<HashSet<_>>();
     let count = Arc::new(AtomicUsize::new(0));
     let all = all_paths.len();
-    let _ =
+    let results =
         join_all(all_paths.into_iter().map(|path| {
             save_content_with_log(path, &output, &extensions, Arc::clone(&count), all)
         }))
         .await;
 
+    for result in results {
+        if let Err(path) = result {
+            log::error!("Err: path = {path}");
+        }
+    }
+
     Ok(())
 }
 
-async fn save_content_with_log(
-    path: &str,
-    directory: &Path,
-    exntentions: &HashSet<String>,
+async fn save_content_with_log<'a>(
+    path: &'a str,
+    directory: &'a Path,
+    extensions: &'a [String],
     count: Arc<AtomicUsize>,
     all: usize,
-) {
-    let res = save_content(path, directory, exntentions).await;
+) -> Result<(), &'a str> {
+    let res = save_content(path, directory, extensions).await;
     let count = count.fetch_add(1, Ordering::Relaxed);
     let count = count + 1; // fetch_add で返されるのは前の値なので 1 足しておく
     match res {
         Ok(true) => log::info!("Content saved ({count}/{all}): {path}"),
         Ok(false) => log::info!("Content skipped ({count}/{all}): {path}"),
-        Err(e) => log::error!("Error ({count}/{all}): {path} {e:?}"),
+        Err(e) => {
+            log::error!("Error ({count}/{all}): {path} {e:?}");
+            return Err(path);
+        }
     }
+    Ok(())
 }
 
-async fn save_content(path: &str, directory: &Path, exntentions: &HashSet<String>) -> Result<bool> {
+async fn save_content(path: &str, directory: &Path, extentions: &[String]) -> Result<bool> {
     const HOST: &str = "https://video.candfans.jp";
 
-    let splited = path.split("/");
-    let Some(name) = splited.last() else {
-        bail!("name not found");
-    };
-
-    let Some(ext) = name.split(".").last() else {
-        bail!("extension not found.");
-    };
-
     // skip
-    if !exntentions.contains(ext) {
+    if !extentions.iter().any(|ext| path.ends_with(ext)) {
         return Ok(false);
     }
 
@@ -142,7 +141,7 @@ async fn save_content(path: &str, directory: &Path, exntentions: &HashSet<String
         .await
         .context("get bytes")?;
 
-    tokio::fs::write(directory.join(name), bytes)
+    tokio::fs::write(directory.join(path.replace('/', "_")), bytes)
         .await
         .context("write content")?;
 
