@@ -108,8 +108,10 @@ async fn save_content_with_log(
     count: Arc<AtomicUsize>,
     all: usize,
 ) {
+    let res = save_content(path, directory, exntentions).await;
     let count = count.fetch_add(1, Ordering::Relaxed);
-    match save_content(path, directory, exntentions).await {
+    let count = count + 1; // fetch_add で返されるのは前の値なので 1 足しておく
+    match res {
         Ok(true) => log::info!("Content saved ({count}/{all}): {path}"),
         Ok(false) => log::info!("Content skipped ({count}/{all}): {path}"),
         Err(e) => log::error!("Error ({count}/{all}): {path} {e:?}"),
